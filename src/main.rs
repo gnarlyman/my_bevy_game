@@ -1,3 +1,9 @@
+use bevy::prelude::*;
+use my_bevy_game::setup::SceneSetupPlugin;
+
 fn main() {
-    println!("Hello, world!");
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .add_plugins(SceneSetupPlugin)
+        .run();
 }
