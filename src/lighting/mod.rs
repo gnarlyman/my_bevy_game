@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
-/// System that spawns directional lighting (sun) and ambient lighting (sky)
+/// System that spawns directional lighting (distant star light)
 pub fn setup_lighting(mut commands: Commands) {
-    // Directional light simulating the sun
+    // Dim directional light simulating distant starlight
     commands.spawn((
         DirectionalLight {
-            illuminance: 10000.0,
+            illuminance: 3000.0,
             shadows_enabled: true,
             ..default()
         },
