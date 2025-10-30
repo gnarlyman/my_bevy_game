@@ -1,29 +1,29 @@
-use bevy::prelude::*;
-use bevy::input::mouse::MouseMotion;
+use bevy::{
+    input::mouse::AccumulatedMouseMotion,
+    prelude::*,
+    window::{CursorGrabMode, CursorOptions},
+};
 
-/// Component that marks a camera as an orbit camera and stores its state
+/// Component that marks a camera as a free-fly camera (like spectator mode)
 #[derive(Component)]
-pub struct OrbitCamera {
-    /// The point the camera orbits around
-    pub target: Vec3,
-    /// Distance from the target
-    pub distance: f32,
-    /// Horizontal rotation angle in radians
+pub struct FreeFlyCam {
+    /// Horizontal rotation angle in radians (yaw)
     pub yaw: f32,
-    /// Vertical rotation angle in radians
+    /// Vertical rotation angle in radians (pitch)
     pub pitch: f32,
-    /// Mouse sensitivity
-    pub sensitivity: f32,
+    /// Mouse sensitivity for looking around
+    pub mouse_sensitivity: f32,
+    /// Movement speed in units per second
+    pub move_speed: f32,
 }
 
-impl Default for OrbitCamera {
+impl Default for FreeFlyCam {
     fn default() -> Self {
         Self {
-            target: Vec3::ZERO,
-            distance: 10.0,
             yaw: std::f32::consts::FRAC_PI_4,      // 45 degrees
-            pitch: std::f32::consts::FRAC_PI_6,    // 30 degrees
-            sensitivity: 0.003,
+            pitch: -std::f32::consts::FRAC_PI_6,   // -30 degrees (looking down)
+            mouse_sensitivity: 0.003,
+            move_speed: 5.0,
         }
     }
 }
@@ -33,49 +33,111 @@ pub fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(8.0, 6.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-        OrbitCamera::default(),
+        FreeFlyCam::default(),
     ));
 }
 
-/// System that handles mouse input and orbits the camera around the target
-pub fn orbit_camera(
-    mut mouse_motion: MessageReader<MouseMotion>,
+/// System that locks/unlocks the cursor when the window is clicked or Escape is pressed
+pub fn toggle_cursor_lock(
+    mut windows: Query<(&Window, &mut CursorOptions)>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
-    mut query: Query<(&mut OrbitCamera, &mut Transform)>,
+    key_input: Res<ButtonInput<KeyCode>>,
 ) {
-    // Only rotate when right mouse button is held (like many 3D applications)
-    // Or if you prefer always rotating, remove this check
-    let should_rotate = mouse_buttons.pressed(MouseButton::Right) 
-        || mouse_buttons.pressed(MouseButton::Left);
+    // Lock cursor when window is clicked
+    if mouse_buttons.just_pressed(MouseButton::Left) || mouse_buttons.just_pressed(MouseButton::Right) {
+        for (window, mut cursor_options) in &mut windows {
+            if !window.focused {
+                continue;
+            }
+            cursor_options.grab_mode = CursorGrabMode::Locked;
+            cursor_options.visible = false;
+        }
+    }
     
-    if !should_rotate {
+    // Unlock cursor when Escape is pressed
+    if key_input.just_pressed(KeyCode::Escape) {
+        for (_, mut cursor_options) in &mut windows {
+            cursor_options.grab_mode = CursorGrabMode::None;
+            cursor_options.visible = true;
+        }
+    }
+}
+
+/// System that handles mouse look
+pub fn camera_look(
+    accumulated_mouse_motion: Res<AccumulatedMouseMotion>,
+    mut query: Query<(&mut FreeFlyCam, &mut Transform)>,
+    windows: Query<(&Window, &CursorOptions)>,
+) {
+    // Only rotate if cursor is locked on a focused window
+    let cursor_grab = windows.iter().any(|(window, cursor_options)| {
+        window.focused && cursor_options.grab_mode == CursorGrabMode::Locked
+    });
+    
+    if !cursor_grab || accumulated_mouse_motion.delta == Vec2::ZERO {
         return;
     }
 
-    let mut total_delta = Vec2::ZERO;
-    for event in mouse_motion.read() {
-        total_delta += event.delta;
-    }
-
-    if total_delta == Vec2::ZERO {
-        return;
-    }
-
-    for (mut orbit, mut transform) in query.iter_mut() {
+    for (mut cam, mut transform) in query.iter_mut() {
         // Update angles based on mouse movement
-        orbit.yaw -= total_delta.x * orbit.sensitivity;
-        orbit.pitch -= total_delta.y * orbit.sensitivity;
+        cam.yaw -= accumulated_mouse_motion.delta.x * cam.mouse_sensitivity;
+        cam.pitch -= accumulated_mouse_motion.delta.y * cam.mouse_sensitivity;
 
         // Clamp pitch to prevent camera flipping
-        orbit.pitch = orbit.pitch.clamp(-std::f32::consts::FRAC_PI_2 + 0.1, std::f32::consts::FRAC_PI_2 - 0.1);
+        cam.pitch = cam.pitch.clamp(-std::f32::consts::FRAC_PI_2 + 0.01, std::f32::consts::FRAC_PI_2 - 0.01);
 
-        // Calculate new camera position using spherical coordinates
-        let x = orbit.distance * orbit.pitch.cos() * orbit.yaw.cos();
-        let y = orbit.distance * orbit.pitch.sin();
-        let z = orbit.distance * orbit.pitch.cos() * orbit.yaw.sin();
+        // Calculate rotation from yaw and pitch
+        transform.rotation = Quat::from_euler(EulerRot::ZYX, 0.0, cam.yaw, cam.pitch);
+    }
+}
 
-        transform.translation = orbit.target + Vec3::new(x, y, z);
-        transform.look_at(orbit.target, Vec3::Y);
+/// System that handles WASD movement and Ctrl/Space for up/down
+pub fn camera_movement(
+    time: Res<Time>,
+    key_input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&FreeFlyCam, &mut Transform)>,
+    windows: Query<(&Window, &CursorOptions)>,
+) {
+    // Only move if cursor is locked on a focused window
+    let cursor_grab = windows.iter().any(|(window, cursor_options)| {
+        window.focused && cursor_options.grab_mode == CursorGrabMode::Locked
+    });
+    
+    if !cursor_grab {
+        return;
+    }
+
+    for (cam, mut transform) in query.iter_mut() {
+        let mut movement = Vec3::ZERO;
+        let speed = cam.move_speed * time.delta_secs();
+
+        // Get forward and right vectors based on camera rotation
+        let forward = *transform.forward();
+        let right = *transform.right();
+
+        // WASD movement
+        if key_input.pressed(KeyCode::KeyW) {
+            movement += forward * speed;
+        }
+        if key_input.pressed(KeyCode::KeyS) {
+            movement -= forward * speed;
+        }
+        if key_input.pressed(KeyCode::KeyA) {
+            movement -= right * speed;
+        }
+        if key_input.pressed(KeyCode::KeyD) {
+            movement += right * speed;
+        }
+
+        // Up/Down movement (world space, not relative to camera)
+        if key_input.pressed(KeyCode::Space) {
+            movement.y += speed;
+        }
+        if key_input.pressed(KeyCode::ControlLeft) || key_input.pressed(KeyCode::ControlRight) {
+            movement.y -= speed;
+        }
+
+        transform.translation += movement;
     }
 }
 

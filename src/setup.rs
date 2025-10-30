@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::camera::{setup_camera, orbit_camera};
+use crate::camera::{setup_camera, toggle_cursor_lock, camera_look, camera_movement};
 use crate::entities::spawn_entities;
 use crate::lighting::setup_lighting;
 
@@ -23,8 +23,12 @@ impl Plugin for SceneSetupPlugin {
                 spawn_entities,
                 setup_lighting,
             ))
-            // Add runtime systems
-            .add_systems(Update, orbit_camera);
+            // Add runtime systems for camera control
+            .add_systems(Update, (
+                toggle_cursor_lock,
+                camera_look,
+                camera_movement,
+            ));
     }
 }
 
