@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
-/// System that spawns directional lighting (distant star light)
+/// System that spawns directional lighting (cel-shaded style)
 pub fn setup_lighting(mut commands: Commands) {
-    // Dim directional light simulating distant starlight
+    // Directional light for cel shading - stronger for more defined shadows
     commands.spawn((
         DirectionalLight {
-            illuminance: 3000.0,
+            illuminance: 5000.0,
             shadows_enabled: true,
             ..default()
         },
