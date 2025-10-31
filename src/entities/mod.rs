@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::camera::visibility::NoFrustumCulling;
 use crate::orbital::OrbitalBody;
 
 /// Marker component for the home planet where camera starts
@@ -31,6 +32,8 @@ pub fn spawn_entities(
             shadows_enabled: true,
             ..default()
         },
+        // Prevent frustum culling so the light stays active even when star is off-screen
+        NoFrustumCulling,
     ));
 
     // Planet 1: Home planet (small blue-green, closest orbit) - Cel shaded
