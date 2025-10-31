@@ -7,7 +7,9 @@ use crate::debug_ui::{setup_debug_ui, update_debug_stats};
 use crate::entities::spawn_entities;
 use crate::lighting::setup_lighting;
 use crate::orbital::update_orbits;
-use crate::starfield::spawn_starfield;
+use crate::skybox::setup_skybox;
+// Starfield removed in favor of skybox
+// use crate::starfield::spawn_starfield;
 
 /// Plugin that orchestrates all scene setup systems
 pub struct SceneSetupPlugin;
@@ -22,19 +24,19 @@ impl Plugin for SceneSetupPlugin {
             ))
             // Set the space background color (black)
             .insert_resource(ClearColor(Color::srgb(0.0, 0.0, 0.0)))
-            // Insert ambient light for cel shading (slightly boosted for visibility)
+            // Insert very low ambient light (just enough to prevent pure black shadows)
             .insert_resource(AmbientLight {
-                color: Color::srgb(0.1, 0.1, 0.15),
-                brightness: 100.0,
+                color: Color::srgb(0.02, 0.02, 0.03),
+                brightness: 20.0,
                 affects_lightmapped_meshes: false,
             })
             // Add setup systems
             .add_systems(Startup, (
                 setup_camera,
                 spawn_entities,
-                spawn_starfield,
                 setup_lighting,
                 setup_debug_ui,
+                setup_skybox,  // Skybox replaces starfield
             ))
             // Add runtime systems for camera control and orbital mechanics
             .add_systems(Update, (

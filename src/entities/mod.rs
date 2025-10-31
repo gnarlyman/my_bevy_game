@@ -11,22 +11,22 @@ pub fn spawn_entities(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Spawn central star (cel-shaded)
+    // Spawn central star (highly emissive, main light source)
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(8.0))),
         MeshMaterial3d(materials.add(StandardMaterial {
-            emissive: Color::srgb(10.0, 8.0, 2.0).into(),
-            base_color: Color::srgb(1.0, 0.9, 0.3),
-            perceptual_roughness: 1.0,
-            metallic: 0.0,
-            reflectance: 0.0,
+            // Much stronger emissive for bright star glow
+            emissive: Color::srgb(50.0, 40.0, 10.0).into(),
+            base_color: Color::srgb(1.0, 0.95, 0.7),
+            // Unlit appearance - star should glow, not be lit by other sources
+            unlit: true,
             ..default()
         })),
         Transform::from_xyz(0.0, 0.0, 0.0),
-        // Add point light to star
+        // Strong point light - this should be the primary light source
         PointLight {
-            intensity: 1_000_000.0,
-            range: 200.0,
+            intensity: 2_000_000.0,
+            range: 250.0,
             color: Color::srgb(1.0, 0.95, 0.8),
             shadows_enabled: true,
             ..default()
