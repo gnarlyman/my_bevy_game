@@ -27,64 +27,80 @@ pub fn setup_skybox(
         
         commands.entity(camera_entity).insert(Skybox {
             image: skybox_handle,
-            brightness: 1000.0,  // Increased brightness for visibility
+            brightness: 3000.0,  // MUCH brighter for visibility
             ..default()
         });
         
-        info!("Skybox added to camera entity {:?}", camera_entity);
+        warn!("=== SKYBOX ADDED TO CAMERA {:?} ===", camera_entity);
     }
 }
 
 /// Creates a simple dark space procedural texture as a placeholder skybox
 fn create_simple_space_skybox(images: &mut ResMut<Assets<Image>>) -> Handle<Image> {
-    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureViewDimension};
     use rand::Rng;
     
     let mut rng = rand::thread_rng();
     
     // Create cubemap - 6 faces (right, left, top, bottom, front, back)
     let size = 512u32;
-    let face_size = (size * size * 4) as usize;
+    let bytes_per_pixel = 4; // RGBA8 = 4 bytes per pixel
+    let face_size = (size * size) as usize * bytes_per_pixel;
     let mut image_data = Vec::with_capacity(face_size * 6);
     
-    // Generate 6 faces of the cubemap
+    // Generate 6 faces of the cubemap with stars
     for _face in 0..6 {
         for y in 0..size {
             for _x in 0..size {
-                // Very dark blue-black space with some variation
-                let noise = rng.r#gen::<f32>() * 0.02;
-                let t = (y as f32 / size as f32) * 0.02;
+                // Very dark blue-black space with slight variation
+                let noise = rng.r#gen::<f32>() * 0.01;
+                let t = (y as f32 / size as f32) * 0.01;
                 
-                let r = ((t + noise) * 255.0).min(10.0) as u8;
-                let g = ((t + noise) * 255.0).min(10.0) as u8;
-                let b = ((t * 2.0 + noise + 0.05) * 255.0).min(15.0) as u8;
+                let base_r = ((t + noise) * 255.0).min(5.0) as u8;
+                let base_g = ((t + noise) * 255.0).min(5.0) as u8;
+                let base_b = ((t * 2.0 + noise + 0.02) * 255.0).min(10.0) as u8;
                 
-                // Occasionally add a bright star
-                if rng.r#gen::<f32>() < 0.0003 {
+                // Add bright stars randomly scattered - MUCH more visible
+                let star_chance = rng.r#gen::<f32>();
+                if star_chance < 0.003 {
+                    // Bright white star (6x more stars)
                     image_data.push(255);
                     image_data.push(255);
                     image_data.push(255);
+                } else if star_chance < 0.005 {
+                    // Dimmer star
+                    image_data.push(180);
+                    image_data.push(180);
+                    image_data.push(200);
                 } else {
-                    image_data.push(r);
-                    image_data.push(g);
-                    image_data.push(b);
+                    // Dark space
+                    image_data.push(base_r);
+                    image_data.push(base_g);
+                    image_data.push(base_b);
                 }
                 image_data.push(255);  // Alpha
             }
         }
     }
     
-    let image = Image::new(
+    let mut image = Image::new(
         Extent3d {
             width: size,
             height: size,
             depth_or_array_layers: 6,  // 6 faces for cubemap
         },
-        TextureDimension::D2,  // Bevy handles cubemap as 2D array
+        TextureDimension::D2,
         image_data,
         TextureFormat::Rgba8UnormSrgb,
         Default::default(),
     );
+    
+    // Critical: Set texture view dimension to Cube for skybox
+    image.texture_view_descriptor = Some(bevy::render::render_resource::TextureViewDescriptor {
+        label: Some("skybox_cubemap"),
+        dimension: Some(TextureViewDimension::Cube),
+        ..Default::default()
+    });
     
     images.add(image)
 }

@@ -24,20 +24,20 @@ impl Plugin for SceneSetupPlugin {
             ))
             // Set the space background color (black)
             .insert_resource(ClearColor(Color::srgb(0.0, 0.0, 0.0)))
-            // Insert very low ambient light (just enough to prevent pure black shadows)
+            // Insert ambient light (space ambient light - increased for visibility)
             .insert_resource(AmbientLight {
-                color: Color::srgb(0.02, 0.02, 0.03),
-                brightness: 20.0,
+                color: Color::srgb(0.15, 0.15, 0.2),
+                brightness: 200.0,
                 affects_lightmapped_meshes: false,
             })
-            // Add setup systems
+            // Add setup systems (skybox must run after camera setup)
             .add_systems(Startup, (
                 setup_camera,
                 spawn_entities,
                 setup_lighting,
                 setup_debug_ui,
-                setup_skybox,  // Skybox replaces starfield
             ))
+            .add_systems(Startup, setup_skybox.after(setup_camera))
             // Add runtime systems for camera control and orbital mechanics
             .add_systems(Update, (
                 toggle_cursor_lock,
